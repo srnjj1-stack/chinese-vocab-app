@@ -1,0 +1,15 @@
+{
+  "name": "chinese-vocab-app",
+  "version": "1.0.0",
+  "description": "중국어 단어/예문 학습 앱 - 분석, 번역, 고품질 TTS, 저장",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "multer": "^2.0.1"
+  }
+}

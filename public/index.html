@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>중국어 단어장</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header class="topbar">
+  <h1>중국어 단어장</h1>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="new">새 학습</button>
+    <button class="tab-btn" data-tab="library">저장된 목록</button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-new" class="tab-panel active">
+    <div class="input-box">
+      <label for="textInput">단어/예문 입력</label>
+      <textarea id="textInput" rows="6" placeholder="예)
+带饭 도시락  最近我公司的职员们都从家里带饭过来一起吃，既省钱又能促进友谊。
+嫌  싫어하다.
+嫌弃 싫어하다, 불쾌하게 생각하다. 您不嫌弃就请常过来坐坐儿"></textarea>
+
+      <div class="or-divider">또는</div>
+
+      <label class="file-label">사진 붙여넣기 / 업로드 (여러 장 가능)</label>
+      <div id="pasteZone" class="paste-zone" tabindex="0">
+        캡처한 화면을 아무 곳에서나 <strong>Ctrl+V</strong>로 붙여넣거나, 여기로 끌어놓거나, 아래에서 파일을 선택하세요.
+      </div>
+      <input type="file" id="imageInput" accept="image/*" capture="environment" multiple />
+      <div id="imageThumbs" class="image-thumbs"></div>
+      <button id="clearImagesBtn" class="secondary-btn small-btn hidden">사진 모두 지우기</button>
+
+      <div class="actions">
+        <button id="analyzeBtn" class="primary-btn">분석하기</button>
+      </div>
+      <div id="analyzeStatus" class="status"></div>
+    </div>
+
+    <section id="resultsSection" class="results hidden">
+      <div class="results-toolbar">
+        <button id="playAllBtn" class="secondary-btn">▶ 단어 전체 듣기</button>
+        <button id="stopAllBtn" class="secondary-btn hidden">■ 정지</button>
+        <button id="playAllExampleBtn" class="secondary-btn">▶ 예문 전체 듣기</button>
+        <button id="stopAllExampleBtn" class="secondary-btn hidden">■ 정지</button>
+        <div class="save-box">
+          <input type="text" id="saveTitle" placeholder="저장할 제목 (예: 8월 10일 단어)" />
+          <button id="saveBtn" class="secondary-btn">저장하기</button>
+        </div>
+      </div>
+      <div id="cardsContainer" class="cards"></div>
+    </section>
+  </section>
+
+  <section id="tab-library" class="tab-panel">
+    <div id="libraryList" class="library-list"></div>
+    <div id="libraryDetail" class="results hidden">
+      <button id="backToListBtn" class="secondary-btn">← 목록으로</button>
+      <div class="results-toolbar">
+        <button id="libPlayAllBtn" class="secondary-btn">▶ 단어 전체 듣기</button>
+        <button id="libStopAllBtn" class="secondary-btn hidden">■ 정지</button>
+        <button id="libPlayAllExampleBtn" class="secondary-btn">▶ 예문 전체 듣기</button>
+        <button id="libStopAllExampleBtn" class="secondary-btn hidden">■ 정지</button>
+      </div>
+      <div id="libCardsContainer" class="cards"></div>
+    </div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
