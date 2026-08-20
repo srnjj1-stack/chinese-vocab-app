@@ -266,14 +266,28 @@ h1 {
   text-align: left;
 }
 
+.example-zh-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .example-zh {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 17px;
   font-weight: 600;
+  flex: 1;
+}
+
+.icon-btn-small {
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
+  background: var(--card);
 }
 
 .example-ko {
-  margin: 0;
+  margin: 6px 0 0;
   color: var(--sub);
   font-size: 14px;
 }

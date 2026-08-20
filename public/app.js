@@ -242,7 +242,7 @@ async function synthesizeSpeech(text) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       input: { text },
-      voice: { languageCode: 'cmn-CN', name: 'cmn-CN-Wavenet-A' },
+      voice: { languageCode: 'cmn-CN', name: 'cmn-CN-Chirp3-HD-Kore' },
       audioConfig: { audioEncoding: 'MP3' },
     }),
   });
@@ -313,6 +313,22 @@ settingsSaveBtn.addEventListener('click', () => {
   setStatus('설정을 저장했습니다.');
 });
 
+function wireSpeakButton(btn, getText) {
+  btn.addEventListener('click', async () => {
+    const text = getText();
+    if (!text) return;
+    btn.disabled = true;
+    try {
+      audioPlayer.src = await synthesizeSpeech(text);
+      await audioPlayer.play();
+    } catch (err) {
+      setStatus(err.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 function createResultCard(entry) {
   const card = document.createElement('div');
   card.className = 'result-card';
@@ -349,11 +365,23 @@ function createResultCard(entry) {
   exampleBox.className = 'example-box';
   exampleBox.hidden = true;
 
+  const exampleZhRow = document.createElement('div');
+  exampleZhRow.className = 'example-zh-row';
+
   const exampleZh = document.createElement('p');
   exampleZh.className = 'example-zh';
+
+  const exampleSpeakBtn = document.createElement('button');
+  exampleSpeakBtn.type = 'button';
+  exampleSpeakBtn.className = 'icon-btn icon-btn-small';
+  exampleSpeakBtn.title = '예문 읽어주기';
+  exampleSpeakBtn.innerHTML = '<span class="speaker">🔊</span>';
+
+  exampleZhRow.append(exampleZh, exampleSpeakBtn);
+
   const exampleKo = document.createElement('p');
   exampleKo.className = 'example-ko';
-  exampleBox.append(exampleZh, exampleKo);
+  exampleBox.append(exampleZhRow, exampleKo);
 
   card.append(wordRow, pinyinEl, meaningEl, exampleBtn, exampleBox);
 
@@ -363,17 +391,8 @@ function createResultCard(entry) {
     exampleKo.textContent = entry.exampleTranslation || '';
   }
 
-  speakBtn.addEventListener('click', async () => {
-    speakBtn.disabled = true;
-    try {
-      audioPlayer.src = await synthesizeSpeech(entry.word);
-      await audioPlayer.play();
-    } catch (err) {
-      setStatus(err.message, true);
-    } finally {
-      speakBtn.disabled = false;
-    }
-  });
+  wireSpeakButton(speakBtn, () => entry.word);
+  wireSpeakButton(exampleSpeakBtn, () => entry.example);
 
   exampleBtn.addEventListener('click', async () => {
     if (exampleLoaded) {
