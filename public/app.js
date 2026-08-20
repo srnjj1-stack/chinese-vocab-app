@@ -99,14 +99,14 @@ const ANALYZE_SYSTEM_PROMPT = `당신은 중국어 학습 자료를 구조화된
     "word": "중국어 단어",
     "pinyin": "한어병음(성조 포함)",
     "meaning": "한국어 뜻",
-    "example": "중국어 예문 (없으면 빈 문자열)",
-    "exampleTranslation": "예문의 자연스러운 한국어 번역 (예문이 없으면 빈 문자열)"
+    "example": "그 단어를 사용한 자연스럽고 실생활에서 쓸 법한 중국어 예문 1개",
+    "exampleTranslation": "예문의 자연스러운 한국어 번역"
   }
 ]
 
 규칙:
 - 입력에 이미 한국어 뜻이 쓰여 있으면 그대로 사용하되 자연스럽게 다듬어도 됩니다. 없으면 정확한 한국어 뜻을 채우세요.
-- 예문이 있는 경우에만 example과 exampleTranslation을 채우고, 예문이 없으면 둘 다 빈 문자열("")로 두세요. 예문이 없는데 지어내지 마세요.
+- 입력에 이미 예문이 있으면 그대로 사용하되 자연스럽게 다듬어도 됩니다. 없으면 반드시 새 예문을 만들어서 채우세요 — example과 exampleTranslation을 빈 문자열로 남겨두지 마세요.
 - 사진에서 글자를 인식할 때 오탈자가 없도록 신중하게 확인하세요.
 - 사진이 여러 장 주어질 수 있습니다. 모든 사진에 나온 단어를 순서대로 하나의 JSON 배열로 합쳐서 반환하세요.
 - 입력에 여러 단어가 있으면 각각을 배열의 별도 원소로 만드세요.
@@ -186,9 +186,12 @@ async function callGemini(parts, retries = 1) {
   }
 }
 
-async function generateExample(word, retries = 1) {
+async function generateExample(word, avoidExample, retries = 1) {
+  const userText = avoidExample
+    ? `단어: ${word}\n\n아래 예문과는 다른, 새로운 예문을 만들어줘:\n${avoidExample}`
+    : `단어: ${word}`;
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const text = await callGeminiOnce(EXAMPLE_SYSTEM_PROMPT, [{ text: `단어: ${word}` }]);
+    const text = await callGeminiOnce(EXAMPLE_SYSTEM_PROMPT, [{ text: userText }]);
     const s = text.trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
     let parsed;
     try {
@@ -381,7 +384,13 @@ function createResultCard(entry) {
 
   const exampleKo = document.createElement('p');
   exampleKo.className = 'example-ko';
-  exampleBox.append(exampleZhRow, exampleKo);
+
+  const regenerateBtn = document.createElement('button');
+  regenerateBtn.type = 'button';
+  regenerateBtn.className = 'regenerate-btn';
+  regenerateBtn.textContent = '🔄 예문 새로 만들기';
+
+  exampleBox.append(exampleZhRow, exampleKo, regenerateBtn);
 
   card.append(wordRow, pinyinEl, meaningEl, exampleBtn, exampleBox);
 
@@ -417,6 +426,23 @@ function createResultCard(entry) {
       exampleBtn.textContent = '예문 보기';
     } finally {
       exampleBtn.disabled = false;
+    }
+  });
+
+  regenerateBtn.addEventListener('click', async () => {
+    regenerateBtn.disabled = true;
+    regenerateBtn.textContent = '만드는 중...';
+    try {
+      const data = await generateExample(entry.word, entry.example);
+      entry.example = data.example || '';
+      entry.exampleTranslation = data.exampleTranslation || '';
+      exampleZh.textContent = entry.example;
+      exampleKo.textContent = entry.exampleTranslation;
+    } catch (err) {
+      setStatus(err.message, true);
+    } finally {
+      regenerateBtn.disabled = false;
+      regenerateBtn.textContent = '🔄 예문 새로 만들기';
     }
   });
 
