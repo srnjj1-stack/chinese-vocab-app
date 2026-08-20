@@ -1,4 +1,2 @@
 node_modules/
 .env
-audio_cache/*.mp3
-data/library.json

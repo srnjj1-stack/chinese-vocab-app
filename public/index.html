@@ -1,75 +1,79 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>중국어 단어장</title>
 <link rel="stylesheet" href="style.css" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="theme-color" content="#d64545" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="중국어 단어장" />
 </head>
 <body>
-<header class="topbar">
-  <h1>중국어 단어장</h1>
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="new">새 학습</button>
-    <button class="tab-btn" data-tab="library">저장된 목록</button>
-  </nav>
-</header>
+  <main class="wrap">
+    <div class="header-row">
+      <h1>중국어 단어장</h1>
+      <button id="settings-btn" class="icon-btn" title="설정" type="button">⚙️</button>
+    </div>
+    <p class="sub">중국어 단어를 입력하면 발음, 뜻, 병음을 알려드려요. 여러 단어는 쉼표(,)나 공백, 줄바꿈으로 구분하세요.</p>
 
-<main>
-  <section id="tab-new" class="tab-panel active">
-    <div class="input-box">
-      <label for="textInput">단어/예문 입력</label>
-      <textarea id="textInput" rows="6" placeholder="예)
-带饭 도시락  最近我公司的职员们都从家里带饭过来一起吃，既省钱又能促进友谊。
-嫌  싫어하다.
-嫌弃 싫어하다, 불쾌하게 생각하다. 您不嫌弃就请常过来坐坐儿"></textarea>
+    <div id="settings-panel" class="settings-panel" hidden>
+      <h2>API 키 설정</h2>
+      <p class="settings-note">키는 이 기기의 브라우저에만 저장되고 서버로 전송되지 않습니다. 다른 사람과 이 화면을 공유하지 마세요.</p>
 
-      <div class="or-divider">또는</div>
+      <label class="settings-label" for="gemini-key-input">Gemini API 키 (필수)</label>
+      <input id="gemini-key-input" type="password" autocomplete="off" placeholder="AIza..." />
+      <p class="settings-hint"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 무료로 발급받으세요.</p>
 
-      <label class="file-label">사진 붙여넣기 / 업로드 (여러 장 가능)</label>
-      <div id="pasteZone" class="paste-zone" tabindex="0">
-        캡처한 화면을 아무 곳에서나 <strong>Ctrl+V</strong>로 붙여넣거나, 여기로 끌어놓거나, 아래에서 파일을 선택하세요.
+      <label class="settings-label" for="tts-key-input">Google TTS API 키 (발음 듣기용, 선택)</label>
+      <input id="tts-key-input" type="password" autocomplete="off" placeholder="AIza..." />
+      <p class="settings-hint"><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>에서 "Cloud Text-to-Speech API"를 사용하도록 발급받으세요.</p>
+
+      <div class="settings-actions">
+        <button id="settings-save-btn" type="button">저장</button>
+        <button id="settings-close-btn" type="button" class="settings-close">닫기</button>
       </div>
-      <input type="file" id="imageInput" accept="image/*" capture="environment" multiple />
-      <div id="imageThumbs" class="image-thumbs"></div>
-      <button id="clearImagesBtn" class="secondary-btn small-btn hidden">사진 모두 지우기</button>
-
-      <div class="actions">
-        <button id="analyzeBtn" class="primary-btn">분석하기</button>
-      </div>
-      <div id="analyzeStatus" class="status"></div>
     </div>
 
-    <section id="resultsSection" class="results hidden">
-      <div class="results-toolbar">
-        <button id="playAllBtn" class="secondary-btn">▶ 단어 전체 듣기</button>
-        <button id="stopAllBtn" class="secondary-btn hidden">■ 정지</button>
-        <button id="playAllExampleBtn" class="secondary-btn">▶ 예문 전체 듣기</button>
-        <button id="stopAllExampleBtn" class="secondary-btn hidden">■ 정지</button>
-        <div class="save-box">
-          <input type="text" id="saveTitle" placeholder="저장할 제목 (예: 8월 10일 단어)" />
-          <button id="saveBtn" class="secondary-btn">저장하기</button>
-        </div>
+    <form id="search-form" class="search-box">
+      <input
+        id="word-input"
+        type="text"
+        placeholder="예: 谢谢, 拍摄, 苹果"
+        autocomplete="off"
+        autofocus
+      />
+      <button type="submit" id="search-btn">검색</button>
+    </form>
+
+    <div class="photo-row">
+      <label for="photo-input" class="photo-label">📷 사진으로 단어 추출 (여러 장 가능)</label>
+      <input id="photo-input" type="file" accept="image/*" multiple hidden />
+    </div>
+
+    <div id="status" class="status" hidden></div>
+
+    <section id="results" class="results"></section>
+
+    <div id="save-bar" class="save-bar" hidden>
+      <select id="save-target"></select>
+      <input id="save-title" type="text" placeholder="새 단어장 이름 (선택)" autocomplete="off" />
+      <button id="save-btn" type="button">💾 저장하기</button>
+    </div>
+
+    <section class="library">
+      <h2>저장된 단어장</h2>
+      <div id="library-list" class="library-list">
+        <p class="library-empty">아직 저장된 단어장이 없어요.</p>
       </div>
-      <div id="cardsContainer" class="cards"></div>
     </section>
-  </section>
+  </main>
 
-  <section id="tab-library" class="tab-panel">
-    <div id="libraryList" class="library-list"></div>
-    <div id="libraryDetail" class="results hidden">
-      <button id="backToListBtn" class="secondary-btn">← 목록으로</button>
-      <div class="results-toolbar">
-        <button id="libPlayAllBtn" class="secondary-btn">▶ 단어 전체 듣기</button>
-        <button id="libStopAllBtn" class="secondary-btn hidden">■ 정지</button>
-        <button id="libPlayAllExampleBtn" class="secondary-btn">▶ 예문 전체 듣기</button>
-        <button id="libStopAllExampleBtn" class="secondary-btn hidden">■ 정지</button>
-      </div>
-      <div id="libCardsContainer" class="cards"></div>
-    </div>
-  </section>
-</main>
-
-<script src="app.js"></script>
+  <audio id="audio-player"></audio>
+  <script src="app.js"></script>
 </body>
 </html>
