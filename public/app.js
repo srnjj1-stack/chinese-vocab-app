@@ -1,9 +1,22 @@
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js';
+import {
+  getFirestore,
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+} from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
 // ---------- local storage ----------
 
 const LS_GEMINI_KEY = 'zhVocab.geminiKey';
 const LS_TTS_KEY = 'zhVocab.ttsKey';
+const LS_FIREBASE_CONFIG = 'zhVocab.firebaseConfig';
 const LS_LIBRARY = 'zhVocab.library';
 const LS_MIGRATED = 'zhVocab.migratedSeed';
+const LS_MIGRATED_SHARED = 'zhVocab.migratedToShared';
 
 function getGeminiKey() {
   return localStorage.getItem(LS_GEMINI_KEY) || '';
@@ -27,6 +40,94 @@ function writeLibrary(list) {
   localStorage.setItem(LS_LIBRARY, JSON.stringify(list));
 }
 
+// ---------- shared library (Firebase Firestore, optional) ----------
+//
+// When a Firebase config is set, word lists live in a shared Firestore
+// collection instead of localStorage, so everyone who enters the same config
+// sees the same notebooks update in real time. Without a config, everything
+// falls back to the plain localStorage behavior above.
+
+function getFirebaseConfigText() {
+  return localStorage.getItem(LS_FIREBASE_CONFIG) || '';
+}
+
+// Accepts the config exactly as Firebase's console shows it to copy
+// (an unquoted-key JS object literal, not strict JSON).
+function parseFirebaseConfig(text) {
+  if (!text || !text.trim()) return null;
+  try {
+    return Function(`"use strict"; return (${text});`)();
+  } catch {
+    throw new Error('Firebase 설정을 읽지 못했습니다. Firebase 콘솔에서 복사한 내용을 그대로 붙여넣었는지 확인해주세요.');
+  }
+}
+
+let firestoreDb = null;
+let sharedNotebooks = [];
+let unsubscribeNotebooks = null;
+
+function isSharedMode() {
+  return firestoreDb !== null;
+}
+
+function currentNotebooks() {
+  return isSharedMode() ? sharedNotebooks : readLibrary();
+}
+
+// Runs once, the first time this device successfully connects to a shared
+// library that's still empty: uploads whatever was saved locally so it isn't
+// lost. Never runs again after that, even if the shared library is later
+// emptied out (e.g. by someone deleting notebooks) — that emptiness is real.
+async function migrateLocalToShared() {
+  if (localStorage.getItem(LS_MIGRATED_SHARED)) return;
+  localStorage.setItem(LS_MIGRATED_SHARED, '1');
+  const local = readLibrary();
+  if (!local.length || sharedNotebooks.length) return;
+  for (const notebook of local) {
+    const { id, ...rest } = notebook;
+    await addDoc(collection(firestoreDb, 'notebooks'), rest);
+  }
+}
+
+function disconnectShared() {
+  if (unsubscribeNotebooks) unsubscribeNotebooks();
+  unsubscribeNotebooks = null;
+  firestoreDb = null;
+  sharedNotebooks = [];
+}
+
+async function connectShared(configText) {
+  disconnectShared();
+  const config = parseFirebaseConfig(configText);
+  if (!config) return;
+
+  const app = initializeApp(config, 'zhVocab-' + Date.now());
+  firestoreDb = getFirestore(app);
+
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    unsubscribeNotebooks = onSnapshot(
+      collection(firestoreDb, 'notebooks'),
+      (snapshot) => {
+        sharedNotebooks = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (!settled) {
+          settled = true;
+          migrateLocalToShared().finally(resolve);
+        } else {
+          refreshLibrary();
+        }
+      },
+      (err) => {
+        firestoreDb = null;
+        if (!settled) {
+          settled = true;
+          reject(new Error('공유 단어장에 연결하지 못했습니다: ' + err.message));
+        }
+      }
+    );
+  });
+}
+
 // One-time import of the word lists this app previously saved server-side,
 // so switching to browser-only storage doesn't lose them. Never overwrites
 // anything the user has already saved locally.
@@ -45,16 +146,34 @@ async function migrateSeedLibrary() {
 }
 
 function getLibraryItems() {
-  return readLibrary()
+  return currentNotebooks()
     .map(({ id, title, createdAt, entries }) => ({ id, title, createdAt, count: entries.length }))
     .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 function libraryGet(id) {
-  return readLibrary().find((x) => x.id === id) || null;
+  return currentNotebooks().find((x) => x.id === id) || null;
 }
 
-function librarySave({ id, title, entries }) {
+async function librarySave({ id, title, entries }) {
+  if (isSharedMode()) {
+    if (id) {
+      const existing = sharedNotebooks.find((x) => x.id === id);
+      if (!existing) throw new Error('단어장을 찾을 수 없습니다.');
+      const existingWords = new Set(existing.entries.map((e) => e.word));
+      const toAdd = entries.filter((e) => !existingWords.has(e.word));
+      await updateDoc(doc(firestoreDb, 'notebooks', id), { entries: existing.entries.concat(toAdd) });
+      return { id, title: existing.title, added: toAdd.length, skipped: entries.length - toAdd.length };
+    }
+    const record = {
+      title: title && title.trim() ? title.trim() : `저장 ${new Date().toLocaleString('ko-KR')}`,
+      createdAt: Date.now(),
+      entries,
+    };
+    const ref = await addDoc(collection(firestoreDb, 'notebooks'), record);
+    return { id: ref.id, title: record.title, added: entries.length, skipped: 0 };
+  }
+
   const list = readLibrary();
 
   if (id) {
@@ -78,7 +197,12 @@ function librarySave({ id, title, entries }) {
   return { ...record, added: entries.length, skipped: 0 };
 }
 
-function libraryDelete(id) {
+async function libraryDelete(id) {
+  if (isSharedMode()) {
+    await deleteDoc(doc(firestoreDb, 'notebooks', id));
+    return;
+  }
+
   const list = readLibrary();
   const next = list.filter((x) => x.id !== id);
   if (next.length === list.length) throw new Error('찾을 수 없습니다.');
@@ -283,6 +407,8 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsPanel = document.getElementById('settings-panel');
 const geminiKeyInput = document.getElementById('gemini-key-input');
 const ttsKeyInput = document.getElementById('tts-key-input');
+const firebaseConfigInput = document.getElementById('firebase-config-input');
+const firebaseStatusEl = document.getElementById('firebase-status');
 const settingsSaveBtn = document.getElementById('settings-save-btn');
 const settingsCloseBtn = document.getElementById('settings-close-btn');
 
@@ -299,9 +425,17 @@ function setLoading(isLoading) {
   input.disabled = isLoading;
 }
 
+function setFirebaseStatus(text, isError = false) {
+  firebaseStatusEl.hidden = !text;
+  firebaseStatusEl.textContent = text || '';
+  firebaseStatusEl.style.color = isError ? 'var(--accent-dark)' : '';
+}
+
 function openSettings() {
   geminiKeyInput.value = getGeminiKey();
   ttsKeyInput.value = getTtsKey();
+  firebaseConfigInput.value = getFirebaseConfigText();
+  setFirebaseStatus(isSharedMode() ? '✅ 공유 단어장에 연결되어 있어요.' : '');
   settingsPanel.hidden = false;
 }
 function closeSettings() {
@@ -310,10 +444,26 @@ function closeSettings() {
 
 settingsBtn.addEventListener('click', openSettings);
 settingsCloseBtn.addEventListener('click', closeSettings);
-settingsSaveBtn.addEventListener('click', () => {
+settingsSaveBtn.addEventListener('click', async () => {
   setKeys(geminiKeyInput.value.trim(), ttsKeyInput.value.trim());
-  closeSettings();
-  setStatus('설정을 저장했습니다.');
+
+  const configText = firebaseConfigInput.value.trim();
+  localStorage.setItem(LS_FIREBASE_CONFIG, configText);
+
+  settingsSaveBtn.disabled = true;
+  try {
+    await connectShared(configText);
+    refreshLibrary();
+    closeSettings();
+    setStatus(
+      configText ? '설정을 저장했습니다. 공유 단어장에 연결됐어요.' : '설정을 저장했습니다.'
+    );
+  } catch (err) {
+    setStatus('');
+    setFirebaseStatus(err.message, true);
+  } finally {
+    settingsSaveBtn.disabled = false;
+  }
 });
 
 function wireSpeakButton(btn, getText) {
@@ -511,13 +661,14 @@ saveTarget.addEventListener('change', () => {
   saveTitleInput.hidden = saveTarget.value !== 'new';
 });
 
-saveBtn.addEventListener('click', () => {
+saveBtn.addEventListener('click', async () => {
   if (!currentEntries.length) return;
+  saveBtn.disabled = true;
   try {
     const isNew = saveTarget.value === 'new';
     const data = isNew
-      ? librarySave({ title: saveTitleInput.value.trim(), entries: currentEntries })
-      : librarySave({ id: saveTarget.value, entries: currentEntries });
+      ? await librarySave({ title: saveTitleInput.value.trim(), entries: currentEntries })
+      : await librarySave({ id: saveTarget.value, entries: currentEntries });
 
     saveTitleInput.value = '';
     setStatus(
@@ -530,6 +681,8 @@ saveBtn.addEventListener('click', () => {
     saveTitleInput.hidden = true;
   } catch (err) {
     setStatus(err.message, true);
+  } finally {
+    saveBtn.disabled = false;
   }
 });
 
@@ -577,10 +730,10 @@ function renderLibrary(items) {
     deleteBtn.type = 'button';
     deleteBtn.className = 'library-btn danger';
     deleteBtn.textContent = '삭제';
-    deleteBtn.addEventListener('click', () => {
+    deleteBtn.addEventListener('click', async () => {
       if (!confirm(`"${item.title}"을(를) 삭제할까요?`)) return;
       try {
-        libraryDelete(item.id);
+        await libraryDelete(item.id);
         refreshLibrary();
       } catch (err) {
         setStatus(err.message, true);
@@ -622,6 +775,16 @@ function refreshLibrary() {
 
 async function init() {
   await migrateSeedLibrary();
+
+  const configText = getFirebaseConfigText();
+  if (configText) {
+    try {
+      await connectShared(configText);
+    } catch (err) {
+      setStatus(err.message, true);
+    }
+  }
+
   refreshLibrary();
   if (!getGeminiKey()) openSettings();
 }

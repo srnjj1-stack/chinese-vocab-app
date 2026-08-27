@@ -33,6 +33,14 @@
       <input id="tts-key-input" type="password" autocomplete="off" placeholder="AIza..." />
       <p class="settings-hint"><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>에서 "Cloud Text-to-Speech API"를 사용하도록 발급받으세요.</p>
 
+      <label class="settings-label" for="firebase-config-input">공유 단어장 연결 (Firebase, 선택)</label>
+      <textarea id="firebase-config-input" rows="5" placeholder='{ "apiKey": "...", "projectId": "...", ... }'></textarea>
+      <p class="settings-hint">
+        여기에 설정을 붙여넣으면, 같은 설정을 넣은 다른 사람과 단어장이 실시간으로 공유됩니다(자동 반영). 비워두면 이 기기에만 저장돼요.
+        <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase 콘솔</a>에서 프로젝트를 만들고 발급받으세요.
+      </p>
+      <p id="firebase-status" class="settings-hint" hidden></p>
+
       <div class="settings-actions">
         <button id="settings-save-btn" type="button">저장</button>
         <button id="settings-close-btn" type="button" class="settings-close">닫기</button>
@@ -74,6 +82,6 @@
   </main>
 
   <audio id="audio-player"></audio>
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
